@@ -1,0 +1,247 @@
+//Date: 2021-09-30
+//Authors: Darwin Gómez Fernández, Rolando Salas López, Nilton B. Rojas Briceño, 
+         //Jhonsy O. Silva López, Renzo E. Terrones Murga, Daniel Iliquín Trigoso,
+         //Segundo M. Oliva Cruz and Miguel A. Barrena Gurbillón. 
+//Description: This script contains a quick and easy way to process and classify Sentinel-1 images,
+              //showing: collection import, metadata filtering, speckle reduction, 
+              //and classification using CART, Random Forest and SVM.
+
+
+//////////////////////////**************** SENTINEL-1 IMAGE PREPARATION ******************/////////////
+           // study area and training points /// THIS SECTIONS IS OPCIONAL
+var AOI = 
+    /* color: #d63000 */
+    /* shown: false */
+    ee.Geometry.Polygon(
+        [[[-77.95172821796866, -5.8055982935829755],
+          [-77.97009598530265, -5.834459524777532],
+          [-77.94331681049796, -5.840094976678302],
+          [-77.93336045063468, -5.825237754063793],
+          [-77.9424585036132, -5.809184680996158]]]),
+    water = 
+    /* color: #98ff00 */
+    /* shown: false */
+    ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-77.94743668354484, -5.814692303859747]),
+            {
+              "label": 1,
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.94872414387198, -5.8216941639467175]),
+            {
+              "label": 1,
+              "system:index": "1"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.95189987934562, -5.825878160655814]),
+            {
+              "label": 1,
+              "system:index": "2"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.94211518085929, -5.822548043356895]),
+            {
+              "label": 1,
+              "system:index": "3"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.9471791914794, -5.829891352697721]),
+            {
+              "label": 1,
+              "system:index": "4"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.95696388996573, -5.829720579152818]),
+            {
+              "label": 1,
+              "system:index": "5"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.95018326557609, -5.831940631182507]),
+            {
+              "label": 1,
+              "system:index": "6"
+            })]),
+    No_Water = 
+    /* color: #0b4a8b */
+    /* shown: false */
+    ee.FeatureCollection(
+        [ee.Feature(
+            ee.Geometry.Point([-77.95404564655753, -5.815204638041596]),
+            {
+              "label": 0,
+              "system:index": "0"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.96340119160148, -5.829549805555933]),
+            {
+              "label": 0,
+              "system:index": "1"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.95447479999991, -5.835868394017333]),
+            {
+              "label": 0,
+              "system:index": "2"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.94623505390616, -5.836807637575112]),
+            {
+              "label": 0,
+              "system:index": "3"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.93971192158195, -5.832282176868862]),
+            {
+              "label": 0,
+              "system:index": "4"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.93627869404288, -5.8244265734913]),
+            {
+              "label": 0,
+              "system:index": "5"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.9402269057128, -5.814692303859747]),
+            {
+              "label": 0,
+              "system:index": "6"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.94451844013663, -5.810252054745525]),
+            {
+              "label": 0,
+              "system:index": "7"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.95250069416495, -5.809141986994762]),
+            {
+              "label": 0,
+              "system:index": "8"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.96142708576652, -5.824085023025017]),
+            {
+              "label": 0,
+              "system:index": "9"
+            }),
+        ee.Feature(
+            ee.Geometry.Point([-77.96451699055167, -5.833562971340414]),
+            {
+              "label": 0,
+              "system:index": "10"
+            })]);
+                   
+                   // Parameters to form the combination
+var polarization = "VH"; 
+var flight_direction = "DESCENDING"; 
+                  //Sentinel-1 GRD data 
+var collection = ee.ImageCollection('COPERNICUS/S1_GRD')
+  .filter(ee.Filter.eq('instrumentMode','IW'))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', polarization))
+  .filter(ee.Filter.eq('orbitProperties_pass',flight_direction)) 
+  .filter(ee.Filter.eq('resolution_meters',10))
+  .filterDate('2021-02-01', '2021-02-15')
+  .filterBounds(AOI)
+  .select(polarization);
+// Extract date from meta data
+      function dates(collection){
+        var range = collection.reduceColumns(ee.Reducer.minMax(), ["system:time_start"]);
+        var printed = ee.String('from ')
+          .cat(ee.Date(range.get('min')).format('YYYY-MM-dd'))
+          .cat(' to ')
+          .cat(ee.Date(range.get('max')).format('YYYY-MM-dd'));
+        return printed;
+      }
+      // print dates  images to console
+      var before_count = collection.size();
+      print(ee.String('Available images').cat('(').cat(before_count).cat(')'),
+        dates(collection), collection);
+        // Mosaic formation
+var S1_mosaic = collection.mosaic().clip(AOI);
+           // Apply reduce the radar speckle by smoothing  
+var smoothing_radius = 30;
+var S1_mosaic_filtered = S1_mosaic.focal_mean(smoothing_radius, 'circle', 'meters');
+var s1_band = 'VH';
+var vizParams = {
+  bands: [s1_band,s1_band,s1_band],
+  min: -25,
+  max: 0,
+  };
+
+////////////////########### CLASSIFICATION with 3 algorithms******************///////////////////////////
+                                
+                                 // Parameters of clasification ////////////   
+var bands = ['VH'];
+var points = water.merge(No_Water);
+var label = 'label';
+
+var training = S1_mosaic_filtered.select(bands).sampleRegions({
+  collection: points,
+  properties: [label],
+  scale: 10
+});
+
+                   //////////// CART //////////////
+var classifier_CART = ee.Classifier.smileCart().train(training, label, bands);
+var classified_CART = S1_mosaic_filtered.select(bands).classify(classifier_CART);
+
+                  /////////// RF /////////////////
+var classifierRF = ee.Classifier.smileRandomForest(10)
+    .train({
+      features: training,
+      classProperty: 'label',
+      inputProperties: ['VH']
+    });
+
+var classifiedRF = S1_mosaic_filtered.classify(classifierRF);
+
+                ///// SVM //////////////////
+
+var classifier = ee.Classifier.libsvm({
+  kernelType: 'RBF',
+  gamma: 0.5,
+  cost: 10
+});
+
+var classifier_SVM = classifier.train(training, 'label', bands);
+var classifiedsvm = S1_mosaic_filtered.classify(classifier_SVM);
+
+                ///// Classification results ///////
+              
+Map.centerObject(AOI);
+
+Map.addLayer(classified_CART,
+             {min: 0, max: 1, palette: ['white', 'blue']},
+             'CART');
+Map.addLayer(classifiedRF,
+             {min: 0, max: 1, palette: ['white', 'blue']},
+             'RF');
+Map.addLayer(classifiedsvm,
+             {min: 0, max: 1, palette: ['white', 'blue']},
+             'SVM');
+               
+                // Display S1-Images
+Map.addLayer(S1_mosaic_filtered, vizParams, 'SAR image filtered');
+Map.addLayer(S1_mosaic, vizParams, 'Unfiltered SAR image');                
+                // MATRICES DE CONFUSIÓN/////////
+    // De CART
+var matriz_CART = classifier_CART.confusionMatrix();
+print(matriz_CART,'MC de CART');
+print(matriz_CART.kappa(), 'Kappa CART');
+print(matriz_CART.accuracy(),'General CART');
+    
+    // De Random
+var matriz_RF = classifierRF.confusionMatrix();
+print(matriz_RF,'MC de Random');
+print(matriz_RF.kappa(), 'Kappa Random');
+print(matriz_RF.accuracy(),'General Random');    
+    
+    // De SVM
+var matriz_SVM = classifier_SVM.confusionMatrix();
+print(matriz_SVM,'MC de SVM');
+print(matriz_SVM.kappa(), 'Kappa SVM');
+print(matriz_SVM.accuracy(),'General SVM');

@@ -1,4 +1,4 @@
-//Date: 2021-09-30
+//Date: 2021-10-23
 //Authors: Darwin Gómez Fernández, Rolando Salas López, Nilton B. Rojas Briceño, 
          //Jhonsy O. Silva López, Renzo E. Terrones Murga, Daniel Iliquín Trigoso,
          //Segundo M. Oliva Cruz and Miguel A. Barrena Gurbillón. 
@@ -227,21 +227,21 @@ Map.addLayer(classifiedsvm,
                 // Display S1-Images
 Map.addLayer(S1_mosaic_filtered, vizParams, 'SAR image filtered');
 Map.addLayer(S1_mosaic, vizParams, 'Unfiltered SAR image');                
-                // MATRICES DE CONFUSIÓN/////////
-    // De CART
-var matriz_CART = classifier_CART.confusionMatrix();
-print(matriz_CART,'MC de CART');
-print(matriz_CART.kappa(), 'Kappa CART');
-print(matriz_CART.accuracy(),'General CART');
+                // COnfusion matrix/////////
+    // From CART
+var matrix_CART = classifier_CART.confusionMatrix();
+print(matrix_CART,'MC de CART');
+print(matrix_CART.kappa(), 'Kappa CART');
+print(matrix_CART.accuracy(),'General CART');
     
-    // De Random
-var matriz_RF = classifierRF.confusionMatrix();
-print(matriz_RF,'MC de Random');
-print(matriz_RF.kappa(), 'Kappa Random');
-print(matriz_RF.accuracy(),'General Random');    
+    // From Random
+var matrix_RF = classifierRF.confusionMatrix();
+print(matrix_RF,'MC de Random');
+print(matrix_RF.kappa(), 'Kappa Random');
+print(matrix_RF.accuracy(),'General Random');    
     
-    // De SVM
-var matriz_SVM = classifier_SVM.confusionMatrix();
-print(matriz_SVM,'MC de SVM');
-print(matriz_SVM.kappa(), 'Kappa SVM');
-print(matriz_SVM.accuracy(),'General SVM');
+    // From SVM
+var matrix_SVM = classifier_SVM.confusionMatrix();
+print(matrix_SVM,'MC de SVM');
+print(matrix_SVM.kappa(), 'Kappa SVM');
+print(matrix_SVM.accuracy(),'General SVM');
